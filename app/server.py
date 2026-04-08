@@ -14,6 +14,10 @@ class StepResponse(BaseModel):
     done: bool
     info: dict
 
+@app.get("/")
+def root():
+    return {"status": "running"}
+
 
 # ✅ Reset endpoint with proper schema
 @app.post("/reset", response_model=Observation)
