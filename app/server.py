@@ -2,8 +2,24 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from app.env import SupportOpsEnv
 from app.models import Action, Observation
+from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI()
+# app = FastAPI()
+app = FastAPI(
+    root_path="",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
+)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 env = SupportOpsEnv()
 
 
