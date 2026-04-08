@@ -7,12 +7,14 @@ from openai import OpenAI
 from app.env import SupportOpsEnv
 from app.models import Action
 
-client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY"),
-    base_url=os.getenv("API_BASE_URL")
-)
+# ✅ Correct environment variables
+API_BASE = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+MODEL = os.getenv("MODEL_NAME", "gpt-4o-mini")
 
-MODEL = os.getenv("MODEL_NAME")
+client = OpenAI(
+    api_key=os.getenv("HF_TOKEN"),   # 🔥 FIXED (MANDATORY)
+    base_url=API_BASE
+)
 
 env = SupportOpsEnv()
 
