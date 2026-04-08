@@ -2,7 +2,7 @@ name: SupportOpsEnv
 description: Customer support automation environment for AI agents
 version: 1.0
 
-entrypoint: inference.py   # ✅ REQUIRED
+entrypoint: inference.py
 
 observation_space:
   ticket_id: str
