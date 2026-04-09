@@ -1,17 +1,27 @@
+"""FastAPI server for SupportOpsEnv.
+
+Exposes the OpenEnv interface over HTTP: /reset, /step, /state, /tasks, /health.
+"""
+
 from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+from typing import Optional, List
+
 from app.env import SupportOpsEnv
 from app.models import Action, Observation
-from fastapi.middleware.cors import CORSMiddleware
+from app.tasks import TASKS
 
-# app = FastAPI()
+
 app = FastAPI(
+    title="SupportOpsEnv",
+    description="Customer support automation environment for AI agents",
+    version="1.0.0",
     root_path="",
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    openapi_url="/openapi.json",
 )
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,72 +30,77 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 env = SupportOpsEnv()
 
 
-# ✅ Step response model (IMPORTANT)
+# ── Response Models ─────────────────────────────────────────────────
+
 class StepResponse(BaseModel):
     observation: Observation
-    reward: float
+    reward: float = Field(..., gt=0.0, lt=1.0)
     done: bool
     info: dict
 
+
+class ResetRequest(BaseModel):
+    task_id: Optional[str] = None
+
+
+class TaskInfo(BaseModel):
+    id: str
+    difficulty: str
+    description: str
+
+
+# ── Endpoints ───────────────────────────────────────────────────────
+
 @app.get("/")
 def root():
-    return {"status": "running"}
+    """Root endpoint — confirms the server is running."""
+    return {"status": "running", "environment": "SupportOpsEnv"}
 
 
-# ✅ Reset endpoint with proper schema
+@app.get("/health")
+def health():
+    """Health check endpoint for OpenEnv validation."""
+    return {"status": "healthy"}
+
+
+@app.get("/tasks", response_model=List[TaskInfo])
+def list_tasks():
+    """List all available tasks with their difficulty levels."""
+    return [
+        TaskInfo(
+            id=t["id"],
+            difficulty=t["difficulty"],
+            description=t["description"],
+        )
+        for t in TASKS
+    ]
+
+
 @app.post("/reset", response_model=Observation)
-def reset():
-    obs = env.reset()
-    return obs   # ⚠️ NOT model_dump()
+def reset(request: ResetRequest = None):
+    """Reset the environment, optionally selecting a specific task by ID."""
+    task_id = request.task_id if request else None
+    obs = env.reset(task_id=task_id)
+    return obs
 
 
-# ✅ Step endpoint with schema
 @app.post("/step", response_model=StepResponse)
 def step(action: Action):
+    """Execute one step in the environment."""
     obs, reward, done, info = env.step(action)
+    return StepResponse(
+        observation=obs,
+        reward=reward.score,
+        done=done,
+        info=info,
+    )
 
-    return {
-        "observation": obs,   # ⚠️ NOT model_dump()
-        "reward": reward.score,
-        "done": done,
-        "info": info
-    }
 
-
-# ✅ State endpoint
 @app.get("/state")
 def state():
+    """Get the current environment state."""
     return env.state()
-
-
-# from fastapi import FastAPI
-# from app.env import SupportOpsEnv
-# from app.models import Action
-
-# app = FastAPI()
-# env = SupportOpsEnv()
-
-
-# @app.post("/reset")
-# def reset():
-#     obs = env.reset()
-#     return obs.model_dump()
-
-
-# @app.post("/step")
-# def step(action: Action):
-#     obs, reward, done, info = env.step(action)
-#     return {
-#         "observation": obs.model_dump(),
-#         "reward": reward.score,
-#         "done": done,
-#         "info": info
-#     }
-
-
-# @app.get("/state")
-# def state():
-#     return env.state()

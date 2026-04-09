@@ -1,6 +1,9 @@
 name: SupportOpsEnv
-description: Customer support automation environment for AI agents
-version: 1.0
+description: >
+  Customer support ticket resolution environment for AI agents.
+  Agents receive support tickets and must resolve them through
+  appropriate responses, escalations, or closures.
+version: "1.0"
 
 entrypoint: inference.py
 
@@ -11,11 +14,14 @@ observation_space:
   status: str
 
 action_space:
-  action_type: str
-  content: str
+  action_type: str   # "respond" | "escalate" | "close"
+  content: str       # free-text response or note
 
 reward:
-  range: [0.0, 1.0]
+  range: [0.01, 0.99]
+  description: >
+    Scores are strictly in the open interval (0, 1).
+    Partial credit for empathy, relevance, and efficiency.
 
 tasks:
   - easy
