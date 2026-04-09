@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List
 
 
@@ -6,11 +6,11 @@ class Observation(BaseModel):
     ticket_id: str
     message: str
     history: List[str]
-    status: str  # open, resolved, escalated
+    status: str
 
 
 class Action(BaseModel):
-    action_type: str  # classify, respond, escalate, close
+    action_type: str
     content: Optional[str] = None
 
 
