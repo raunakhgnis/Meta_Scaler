@@ -5,12 +5,13 @@ Exposes the OpenEnv interface over HTTP: /reset, /step, /state, /tasks, /health.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional, List
 
 from app.env import SupportOpsEnv
 from app.models import Action, Observation
 from app.tasks import TASKS
+from app.graders import clamp_score
 
 
 app = FastAPI(
@@ -38,7 +39,7 @@ env = SupportOpsEnv()
 
 class StepResponse(BaseModel):
     observation: Observation
-    reward: float = Field(..., gt=0.0, lt=1.0)
+    reward: float
     done: bool
     info: dict
 
@@ -57,7 +58,7 @@ class TaskInfo(BaseModel):
 
 @app.get("/")
 def root():
-    """Root endpoint — confirms the server is running."""
+    """Root endpoint -- confirms the server is running."""
     return {"status": "running", "environment": "SupportOpsEnv"}
 
 
@@ -92,9 +93,13 @@ def reset(request: ResetRequest = None):
 def step(action: Action):
     """Execute one step in the environment."""
     obs, reward, done, info = env.step(action)
+
+    # Final safety clamp at the API boundary
+    safe_reward = clamp_score(reward.score)
+
     return StepResponse(
         observation=obs,
-        reward=reward.score,
+        reward=safe_reward,
         done=done,
         info=info,
     )

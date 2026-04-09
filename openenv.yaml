@@ -18,7 +18,7 @@ action_space:
   content: str       # free-text response or note
 
 reward:
-  range: [0.01, 0.99]
+  range: [0.0, 1.0]
   description: >
     Scores are strictly in the open interval (0, 1).
     Partial credit for empathy, relevance, and efficiency.
