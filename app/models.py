@@ -16,4 +16,12 @@ class Action(BaseModel):
 
 class Reward(BaseModel):
     score: float
-    reason: str
+    reason: str = ""
+
+    @field_validator("score")
+    def validate_score(cls, v):
+        if v <= 0.0:
+            return 0.01
+        if v >= 1.0:
+            return 0.99
+        return v
