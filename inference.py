@@ -82,18 +82,36 @@ def safe_score(score):
     return max(0.01, min(0.99, float(score)))
 
 
+# ── Helpers ─────────────────────────────────────────────────────────
+
+def log_start(task: str, env: str, model: str) -> None:
+    print(f"[START] task={task} env={env} model={model}", flush=True)
+
+def log_step(step: int, action: str, reward: float, done: bool, error: str = None) -> None:
+    error_val = error if error else "null"
+    done_val = str(done).lower()
+    print(f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}", flush=True)
+
+def log_end(success: bool, steps: int, score: float, rewards: list) -> None:
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    print(f"[END] success={str(success).lower()} steps={steps} score={score:.4f} rewards={rewards_str}", flush=True)
+
+
 # ── Main Loop ───────────────────────────────────────────────────────
 
 def run_task(task_id: str):
     """Run a single task and print structured output."""
     obs = env.reset(task_id=task_id)
-    step_scores = []
-
-    print("[START]", json.dumps(obs.model_dump()))
+    rewards = []
+    
+    log_start(task=task_id, env="support-ops-env", model=MODEL)
 
     done = False
+    step_count = 0
+    success = False
 
     while not done:
+        step_count += 1
         prompt = f"""You are a professional customer support agent. Respond helpfully and empathetically.
 
 Current ticket:
@@ -108,29 +126,28 @@ Valid action_types: "respond", "escalate", "close"
 """
         response_text = safe_llm_call(prompt)
         action = parse_action(response_text)
+        action_str = action.action_type
 
         try:
             obs, reward, done, _ = env.step(action)
-            score = safe_score(reward.score)
-        except Exception:
+            score_step = safe_score(reward.score)
+            err = None
+        except Exception as e:
             done = True
-            score = 0.05
+            score_step = 0.01
+            err = str(e)
 
-        step_scores.append(score)
+        rewards.append(score_step)
+        log_step(step=step_count, action=action_str, reward=score_step, done=done, error=err)
 
-        print("[STEP]", json.dumps({
-            "action": action.model_dump(),
-            "reward": score,
-            "done": done
-        }))
+        if done:
+            break
 
-    avg = sum(step_scores) / len(step_scores) if step_scores else 0.05
+    avg = sum(rewards) / len(rewards) if rewards else 0.01
     final_score = safe_score(avg)
+    success = final_score > 0.5
 
-    print("[END]", json.dumps({
-        "task_id": task_id,
-        "score": final_score
-    }))
+    log_end(success=success, steps=step_count, score=final_score, rewards=rewards)
 
 
 if __name__ == "__main__":
@@ -139,8 +156,5 @@ if __name__ == "__main__":
         try:
             run_task(task_id)
         except Exception as e:
-            print("[END]", json.dumps({
-                "task_id": task_id,
-                "score": 0.05,
-                "error": str(e)
-            }))
+            log_start(task=task_id, env="support-ops-env", model=MODEL)
+            log_end(success=False, steps=0, score=0.01, rewards=[])
