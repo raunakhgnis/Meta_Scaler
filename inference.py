@@ -1,7 +1,7 @@
 """Baseline inference script for SupportOpsEnv.
 
-Uses the OpenAI-compatible API to run an LLM agent against all 3 tasks
-and prints reproducible baseline scores.
+Uses the OpenAI-compatible API to run an LLM agent against all 3 tasks.
+Prints structured [START]/[STEP]/[END] output required by openenv validate.
 
 Usage:
     python inference.py
@@ -34,10 +34,6 @@ API_BASE = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
 MODEL = os.getenv("MODEL_NAME", "gpt-4o-mini")
 API_KEY = os.getenv("HF_TOKEN") or os.getenv("OPENAI_API_KEY")
 
-if not API_KEY:
-    print("[WARN] No API key found. Set HF_TOKEN or OPENAI_API_KEY.")
-    print("[WARN] Running in fallback mode with default responses.")
-
 client = OpenAI(api_key=API_KEY or "dummy", base_url=API_BASE)
 env = SupportOpsEnv()
 
@@ -56,8 +52,7 @@ def safe_llm_call(prompt: str) -> str:
         if not content:
             raise ValueError("Empty response from model")
         return content
-    except Exception as e:
-        print(f"  [LLM fallback] {type(e).__name__}: {e}")
+    except Exception:
         return json.dumps({
             "action_type": "respond",
             "content": "I apologize for the inconvenience. Let me help you with your issue. I will process your refund and resolve this matter."
@@ -67,9 +62,7 @@ def safe_llm_call(prompt: str) -> str:
 def parse_action(response_text: str) -> Action:
     """Parse LLM response into an Action, with fallback."""
     try:
-        # Try to extract JSON from the response
         text = response_text.strip()
-        # Handle markdown code blocks
         if "```" in text:
             start = text.find("{")
             end = text.rfind("}") + 1
@@ -84,23 +77,23 @@ def parse_action(response_text: str) -> Action:
         )
 
 
+def safe_score(score):
+    """Ensure score is strictly in (0, 1) exclusive."""
+    return max(0.01, min(0.99, float(score)))
+
+
 # ── Main Loop ───────────────────────────────────────────────────────
 
-def run_task(task_id: str) -> float:
-    """Run a single task and return the final score."""
+def run_task(task_index: int, task_id: str):
+    """Run a single task and print structured output."""
     obs = env.reset(task_id=task_id)
     step_scores = []
 
-    print(f"\n{'='*60}")
-    print(f"[TASK] {task_id} | Ticket: {obs.ticket_id}")
-    print(f"[MSG]  {obs.message}")
-    print(f"{'='*60}")
+    print("[START]", json.dumps(obs.model_dump()))
 
     done = False
-    step_num = 0
 
     while not done:
-        step_num += 1
         prompt = f"""You are a professional customer support agent. Respond helpfully and empathetically.
 
 Current ticket:
@@ -117,56 +110,36 @@ Valid action_types: "respond", "escalate", "close"
         action = parse_action(response_text)
 
         try:
-            obs, reward, done, info = env.step(action)
-            score = clamp_score(reward.score)
-        except Exception as e:
-            print(f"  [STEP ERROR] {e}")
+            obs, reward, done, _ = env.step(action)
+            score = safe_score(reward.score)
+        except Exception:
             done = True
             score = 0.05
 
         step_scores.append(score)
-        print(f"  [STEP {step_num}] action={action.action_type} | "
-              f"reward={score:.4f} | done={done}")
 
-    # Compute final task score
-    if step_scores:
-        avg = sum(step_scores) / len(step_scores)
-    else:
-        avg = 0.05
+        print("[STEP]", json.dumps({
+            "action": action.model_dump(),
+            "reward": score,
+            "done": done
+        }))
 
-    final_score = clamp_score(avg)
-    print(f"  [RESULT] task={task_id} | final_score={final_score:.4f}")
-    return final_score
+    avg = sum(step_scores) / len(step_scores) if step_scores else 0.05
+    final_score = safe_score(avg)
 
-
-def main():
-    """Run all tasks and print summary."""
-    print("=" * 60)
-    print("SupportOpsEnv — Baseline Inference")
-    print(f"Model: {MODEL}")
-    print(f"API:   {API_BASE}")
-    print("=" * 60)
-
-    results = {}
-    for task in TASKS:
-        task_id = task["id"]
-        try:
-            score = run_task(task_id)
-        except Exception as e:
-            print(f"  [TASK ERROR] {task_id}: {e}")
-            score = 0.05
-        results[task_id] = clamp_score(score)
-
-    # Summary
-    print(f"\n{'='*60}")
-    print("BASELINE RESULTS")
-    print(f"{'='*60}")
-    for tid, sc in results.items():
-        print(f"  {tid:8s} → {sc:.4f}")
-    overall = sum(results.values()) / len(results) if results else 0.05
-    print(f"  {'overall':8s} → {clamp_score(overall):.4f}")
-    print(f"{'='*60}\n")
+    print("[END]", json.dumps({
+        "task_id": f"task_{task_index}",
+        "score": final_score
+    }))
 
 
 if __name__ == "__main__":
-    main()
+    for i, task in enumerate(TASKS):
+        try:
+            run_task(i, task["id"])
+        except Exception as e:
+            print("[END]", json.dumps({
+                "task_id": f"task_{i}",
+                "score": 0.05,
+                "error": str(e)
+            }))
