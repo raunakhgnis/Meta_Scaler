@@ -8,7 +8,7 @@ def clamp_score(score: float) -> float:
 
 def grade_task(task, action, state):
     try:
-        score = 0.01   # ✅ FIXED
+        score = 0.01
 
         content = (action.content or "").lower()
 
@@ -35,50 +35,3 @@ def grade_task(task, action, state):
 
     except Exception as e:
         return 0.01, f"error: {str(e)}"
-
-
-# def clamp_score(score: float) -> float:
-#     """Ensure score is strictly between (0, 1)"""
-#     if score <= 0.0:
-#         return 0.01
-#     if score >= 1.0:
-#         return 0.99
-#     return score
-
-
-# def grade_task(task, action, state):
-#     try:
-#         score = 0.0
-#         content = (action.content or "").lower()
-
-#         # 🎯 Respond scoring
-#         if action.action_type == "respond":
-
-#             if any(word in content for word in ["sorry", "apologize", "apology"]):
-#                 score += 0.3
-
-#             if any(word in content for word in ["refund", "support", "help"]):
-#                 score += 0.4
-
-#             if len(content.split()) > 5:
-#                 score += 0.2
-
-#         # 🎯 Close
-#         elif action.action_type == "close":
-#             score += 0.3
-
-#         # 🎯 Escalate
-#         elif action.action_type == "escalate":
-#             score += 0.2
-
-#         # 🎯 Penalty for too many steps
-#         if len(state.get("history", [])) > 3:
-#             score -= 0.1
-
-#         # 🔥 CRITICAL: ALWAYS CLAMP BEFORE RETURN
-#         score = clamp_score(score)
-
-#         return score, "graded"
-
-#     except Exception as e:
-#         return 0.01, f"error: {str(e)}"
