@@ -3,5 +3,8 @@ __pycache__/
 *.pyo
 .venv/
 .env
+.git/
 uv.lock
 test_env.py
+*.md
+!README.md
