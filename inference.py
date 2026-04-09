@@ -84,7 +84,7 @@ def safe_score(score):
 
 # ── Main Loop ───────────────────────────────────────────────────────
 
-def run_task(task_index: int, task_id: str):
+def run_task(task_id: str):
     """Run a single task and print structured output."""
     obs = env.reset(task_id=task_id)
     step_scores = []
@@ -128,18 +128,19 @@ Valid action_types: "respond", "escalate", "close"
     final_score = safe_score(avg)
 
     print("[END]", json.dumps({
-        "task_id": f"task_{task_index}",
+        "task_id": task_id,
         "score": final_score
     }))
 
 
 if __name__ == "__main__":
-    for i, task in enumerate(TASKS):
+    for task in TASKS:
+        task_id = task["id"]
         try:
-            run_task(i, task["id"])
+            run_task(task_id)
         except Exception as e:
             print("[END]", json.dumps({
-                "task_id": f"task_{i}",
+                "task_id": task_id,
                 "score": 0.05,
                 "error": str(e)
             }))
